@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Employee - Update & Delete</title>
+<style>
+  :root { --bg:#f4f6fa; --card:#fff; --text:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+          --primary:#2563eb; --danger:#dc2626; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,Segoe UI,Arial,sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width:900px; margin:32px auto; padding:0 16px; }
+  h1 { font-size:1.4rem; margin:0 0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; min-width:620px; }
+  th, td { padding:12px 14px; text-align:left; border-bottom:1px solid var(--line); font-size:.95rem; }
+  th { background:#f9fafb; color:var(--muted); font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  .actions { display:flex; gap:8px; }
+  button { font:inherit; cursor:pointer; border-radius:8px; padding:7px 14px; border:1px solid transparent; }
+  .btn-edit { background:var(--primary); color:#fff; }
+  .btn-delete { background:var(--danger); color:#fff; }
+  .btn-cancel { background:#fff; border-color:var(--line); color:var(--text); }
+  button:hover { filter:brightness(.93); }
+  .empty { padding:28px; text-align:center; color:var(--muted); }
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; padding:16px; }
+  .overlay.show { display:flex; }
+  .modal { background:var(--card); border-radius:12px; padding:22px; width:100%; max-width:420px; }
+  .modal h2 { margin:0 0 14px; font-size:1.15rem; }
+  label { display:block; font-size:.85rem; color:var(--muted); margin:10px 0 4px; }
+  input { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; }
+  .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#111827; color:#fff;
+           padding:10px 16px; border-radius:8px; opacity:0; transition:opacity .25s; pointer-events:none; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Data Employee</h1>
+  <div class="card scroll">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Nama</th><th>Jabatan</th><th>Departemen</th><th>Gaji (Rp)</th><th>Aksi</th></tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="empty" class="empty" hidden>Belum ada data employee.</div>
+  </div>
+</div>
+
+<!-- Modal Update -->
+<div class="overlay" id="editOverlay">
+  <form class="modal" id="editForm">
+    <h2>Update Employee</h2>
+    <input type="hidden" id="fId">
+    <label for="fNama">Nama</label>
+    <input id="fNama" required>
+    <label for="fJabatan">Jabatan</label>
+    <input id="fJabatan" required>
+    <label for="fDept">Departemen</label>
+    <input id="fDept" required>
+    <label for="fGaji">Gaji (Rp)</label>
+    <input id="fGaji" type="number" min="0" required>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" id="editCancel">Batal</button>
+      <button type="submit" class="btn-edit">Simpan</button>
+    </div>
+  </form>
+</div>
+
+<!-- Modal Delete -->
+<div class="overlay" id="delOverlay">
+  <div class="modal">
+    <h2>Hapus Employee</h2>
+    <p id="delText"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" id="delCancel">Batal</button>
+      <button type="button" class="btn-delete" id="delOk">Ya, Hapus</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = "employees_lab2_v2";
+const defaults = [
+  { id:1, nama:"Andi Pratama", jabatan:"Staff Keuangan", dept:"Finance", gaji:6500000 },
+  { id:2, nama:"Siti Rahma", jabatan:"Marketing Executive", dept:"Marketing", gaji:7200000 },
+  { id:3, nama:"Budi Santoso", jabatan:"Software Engineer", dept:"IT", gaji:10500000 },
+  { id:4, nama:"Dewi Lestari", jabatan:"HR Officer", dept:"HR", gaji:6800000 },
+  { id:5, nama:"Rizky Ramadhan", jabatan:"Data Analyst", dept:"IT", gaji:9200000 },
+  { id:6, nama:"Putri Anggraini", jabatan:"Akuntan", dept:"Finance", gaji:7500000 },
+  { id:7, nama:"Fajar Nugroho", jabatan:"Network Engineer", dept:"IT", gaji:9000000 },
+  { id:8, nama:"Maya Sari", jabatan:"Content Creator", dept:"Marketing", gaji:6300000 },
+  { id:9, nama:"Agus Setiawan", jabatan:"Supervisor Operasional", dept:"Operations", gaji:8800000 },
+  { id:10, nama:"Nadia Putri", jabatan:"Recruiter", dept:"HR", gaji:6600000 },
+  { id:11, nama:"Hendra Wijaya", jabatan:"Manajer Keuangan", dept:"Finance", gaji:15000000 },
+  { id:12, nama:"Lestari Wulandari", jabatan:"Staff Administrasi", dept:"Operations", gaji:5400000 },
+  { id:13, nama:"Dimas Prasetyo", jabatan:"Frontend Developer", dept:"IT", gaji:9800000 },
+  { id:14, nama:"Rina Marlina", jabatan:"Social Media Specialist", dept:"Marketing", gaji:6700000 },
+  { id:15, nama:"Eko Hartono", jabatan:"Staff Gudang", dept:"Logistics", gaji:5200000 },
+  { id:16, nama:"Citra Dewi", jabatan:"Business Analyst", dept:"Strategy", gaji:10200000 },
+  { id:17, nama:"Yoga Saputra", jabatan:"Backend Developer", dept:"IT", gaji:10300000 },
+  { id:18, nama:"Intan Permata", jabatan:"Auditor Internal", dept:"Finance", gaji:8600000 },
+  { id:19, nama:"Joko Susilo", jabatan:"Koordinator Logistik", dept:"Logistics", gaji:7800000 },
+  { id:20, nama:"Fitri Handayani", jabatan:"Customer Service", dept:"Support", gaji:5600000 },
+  { id:21, nama:"Bagas Kurniawan", jabatan:"UI/UX Designer", dept:"IT", gaji:8900000 },
+  { id:22, nama:"Anisa Rahmawati", jabatan:"Brand Manager", dept:"Marketing", gaji:11500000 },
+  { id:23, nama:"Rendi Firmansyah", jabatan:"Staff Pajak", dept:"Finance", gaji:7000000 },
+  { id:24, nama:"Tia Amelia", jabatan:"HR Business Partner", dept:"HR", gaji:9500000 },
+  { id:25, nama:"Galih Permana", jabatan:"Quality Assurance", dept:"IT", gaji:8200000 },
+  { id:26, nama:"Sri Wahyuni", jabatan:"Resepsionis", dept:"Operations", gaji:4900000 },
+  { id:27, nama:"Arif Hidayat", jabatan:"Sales Executive", dept:"Sales", gaji:6900000 },
+  { id:28, nama:"Dian Kusuma", jabatan:"Account Manager", dept:"Sales", gaji:9100000 },
+  { id:29, nama:"Wahyu Nurcahyo", jabatan:"Driver Perusahaan", dept:"Logistics", gaji:4800000 },
+  { id:30, nama:"Laras Ayu", jabatan:"Project Manager", dept:"Strategy", gaji:13500000 }
+];
+
+function load() {
+  try { const s = localStorage.getItem(KEY); if (s) return JSON.parse(s); } catch (e) {}
+  return defaults.map(x => ({...x}));
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(employees)); } catch (e) {} }
+
+let employees = load();
+let deleteId = null;
+
+const $ = id => document.getElementById(id);
+const rupiah = n => new Intl.NumberFormat("id-ID").format(n);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function render() {
+  $("tbody").innerHTML = employees.map(e => `
+    <tr>
+      <td>${e.id}</td>
+      <td>${esc(e.nama)}</td>
+      <td>${esc(e.jabatan)}</td>
+      <td>${esc(e.dept)}</td>
+      <td>${rupiah(e.gaji)}</td>
+      <td><div class="actions">
+        <button class="btn-edit" data-edit="${e.id}">Update</button>
+        <button class="btn-delete" data-del="${e.id}">Delete</button>
+      </div></td>
+    </tr>`).join("");
+  $("empty").hidden = employees.length > 0;
+}
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// Klik tombol Update / Delete (event delegation)
+$("tbody").addEventListener("click", ev => {
+  const editId = ev.target.dataset.edit, delId = ev.target.dataset.del;
+  if (editId) {
+    const e = employees.find(x => x.id == editId);
+    $("fId").value = e.id; $("fNama").value = e.nama; $("fJabatan").value = e.jabatan;
+    $("fDept").value = e.dept; $("fGaji").value = e.gaji;
+    $("editOverlay").classList.add("show");
+  }
+  if (delId) {
+    const e = employees.find(x => x.id == delId);
+    deleteId = e.id;
+    $("delText").textContent = `Yakin ingin menghapus data "${e.nama}"?`;
+    $("delOverlay").classList.add("show");
+  }
+});
+
+// UPDATE
+$("editForm").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const e = employees.find(x => x.id == $("fId").value);
+  e.nama = $("fNama").value.trim();
+  e.jabatan = $("fJabatan").value.trim();
+  e.dept = $("fDept").value.trim();
+  e.gaji = Number($("fGaji").value);
+  save(); render();
+  $("editOverlay").classList.remove("show");
+  toast("Data employee berhasil diupdate");
+});
+$("editCancel").onclick = () => $("editOverlay").classList.remove("show");
+
+// DELETE
+$("delOk").onclick = () => {
+  employees = employees.filter(x => x.id !== deleteId);
+  save(); render();
+  $("delOverlay").classList.remove("show");
+  toast("Data employee berhasil dihapus");
+};
+$("delCancel").onclick = () => $("delOverlay").classList.remove("show");
+
+render();
+</script>
+</body>
+</html>
